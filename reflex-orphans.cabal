@@ -12,7 +12,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 bug-reports:         oss@xkcd.com
 description:
-  This package provides additional instances missing from <https://hackage.haskell.org/package/reflex reflex>, specificly 'Functor' and 'Applicative' for 'Dynamic t'. The inclusion of these instances allows easier, conventional Haskell style programming in reflex.
+  This package provides additional instances missing from <https://hackage.haskell.org/package/reflex reflex>, specificly 'Functor' and 'Applicative' for 'Dynamic'. The inclusion of these instances facilitates easier, conventional Haskell style programming in reflex.
 
 source-repository head
   type: git
