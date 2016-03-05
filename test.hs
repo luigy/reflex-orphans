@@ -3,12 +3,15 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Control.Monad
 import Control.Monad.Trans
+import Data.IORef
+import System.IO.Unsafe
 
 import Reflex
 import Reflex.Host.Class
 import Data.Functor.Identity
 import Data.Dependent.Map (DSum((:=>)))
 import Control.Monad.Ref
+import Control.DeepSeq
 
 import Reflex.Orphans
 
@@ -24,6 +27,18 @@ tests = testGroup "Tests" [
       b <- hold 1 e
       d <- holdDyn 1 e
       return (fmap show e, fmap show b, fmap show d)
+  , runExecuteCountTest "Test mapDyn function execution count" 1 $ \r e -> do
+       d <- holdDyn 1 e
+       mapDyn (\v -> unsafePerformIO $ do
+                  atomicModifyIORef' r (\rv -> (rv+1, ()))
+                  return v
+                  ) $ d
+  , runExecuteCountTest "Test fmap Dynamic function execution count" 1 $ \r e-> do
+       d <- holdDyn 1 e
+       return . fmap (\v -> unsafePerformIO $ do
+                         atomicModifyIORef' r (\rv -> (rv+1, ()))
+                         return v
+                     ) $ d
   , testApplicative
   ]
 
@@ -35,6 +50,26 @@ sameBehavior ba bb = do
       va <- sample ba
       vb <- sample bb
       liftIO $ va @=? vb
+
+runExecuteCountTest :: TestName -> Int
+                    -> (IORef Int -> Event Spider Int -> HostFrame Spider (Dynamic Spider Int))
+                    -> TestTree
+runExecuteCountTest nm tgtcnt frm = testCase nm . runSpiderHost $ do
+    (re, rmt) <- newEventWithTriggerRef
+    cr <- liftIO $ newIORef 0
+    pd <- runHostFrame $ frm cr re
+    ehd <- subscribeEvent . updated $ pd
+    void' . sample . current $ pd
+    Just rt <- readRef rmt
+    forM_ [1..10] $ \nv -> do
+      void' . fireEventsAndRead [rt :=> (Identity nv)] $ readEvent ehd >>= sequence
+      void' . sample . current $ pd
+    cc <- liftIO $ readIORef cr
+    liftIO $ (tgtcnt * (10+1)) @=? cc
+  where
+    void' act = do
+      r <- act
+      r `deepseq` return ()
 
 testApplicative :: TestTree
 testApplicative = testCase "Test Applicative" . runSpiderHost $ do

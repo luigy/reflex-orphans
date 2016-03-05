@@ -41,3 +41,4 @@ test-suite test
       , dependent-map
       , ref-tf
       , mtl
+      , deepseq
