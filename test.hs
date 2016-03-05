@@ -27,18 +27,17 @@ tests = testGroup "Tests" [
       b <- hold 1 e
       d <- holdDyn 1 e
       return (fmap show e, fmap show b, fmap show d)
-  , runExecuteCountTest "Test mapDyn function execution count" 1 $ \r e -> do
-       d <- holdDyn 1 e
+  , runCountTest "Test mapDyn function execution count" 1 $ \r d -> do
        mapDyn (\v -> unsafePerformIO $ do
                   atomicModifyIORef' r (\rv -> (rv+1, ()))
                   return v
                   ) $ d
-  , runExecuteCountTest "Test fmap Dynamic function execution count" 1 $ \r e-> do
-       d <- holdDyn 1 e
+  , runCountTest "Test fmap Dynamic function execution count" 1 $ \r d-> do
        return . fmap (\v -> unsafePerformIO $ do
                          atomicModifyIORef' r (\rv -> (rv+1, ()))
                          return v
                      ) $ d
+  , runNestedCountTest
   , testApplicative
   ]
 
@@ -51,13 +50,38 @@ sameBehavior ba bb = do
       vb <- sample bb
       liftIO $ va @=? vb
 
-runExecuteCountTest :: TestName -> Int
-                    -> (IORef Int -> Event Spider Int -> HostFrame Spider (Dynamic Spider Int))
-                    -> TestTree
-runExecuteCountTest nm tgtcnt frm = testCase nm . runSpiderHost $ do
+runNestedCountTest :: TestTree
+runNestedCountTest = testCase "Test fmap Dynamic function execution count" . runSpiderHost $ do
+    (re, rmt) <- newEventWithTriggerRef
+    cr <- liftIO $ newIORef (0::Int)
+    pd <- runHostFrame $ do
+      d <- holdDyn (1::Int) re
+      return . joinDyn . fmap (fmap (\v -> unsafePerformIO $ do
+                        atomicModifyIORef' cr (\rv -> (rv+(1::Int), ()))
+                        return v
+                    )) . constDyn $ d
+    ehd <- subscribeEvent . updated $ pd
+    void' . sample . current $ pd
+    Just rt <- readRef rmt
+    forM_ [1..10] $ \nv -> do
+      void' . fireEventsAndRead [rt :=> (Identity nv)] $ readEvent ehd >>= sequence
+      void' . sample . current $ pd
+    cc <- liftIO $ readIORef cr
+    liftIO $ (10*2+1) @=? cc
+  where
+    void' act = do
+      r <- act
+      r `deepseq` return ()
+
+runCountTest :: TestName -> Int
+             -> (IORef Int -> Dynamic Spider Int -> HostFrame Spider (Dynamic Spider Int))
+              -> TestTree
+runCountTest nm tgtcnt frm = testCase nm . runSpiderHost $ do
     (re, rmt) <- newEventWithTriggerRef
     cr <- liftIO $ newIORef 0
-    pd <- runHostFrame $ frm cr re
+    pd <- runHostFrame $ do
+      d <- holdDyn 1 re
+      frm cr d
     ehd <- subscribeEvent . updated $ pd
     void' . sample . current $ pd
     Just rt <- readRef rmt
