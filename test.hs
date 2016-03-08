@@ -118,6 +118,23 @@ testApplicative = testCase "Test Applicative" . runSpiderHost $ do
               <*> sample pb
               <*> (sample . current $ pd))
     pb `sameBehavior` (current pd)
+    (rea, rmta) <- newEventWithTriggerRef
+    (reb, rmtb) <- newEventWithTriggerRef
+    fc <- runHostFrame $ do
+      a <- holdDyn (1::Int) rea
+      b <- holdDyn 1 reb
+      return $ (+) <$> a <*> b
+    ehc <- subscribeEvent . updated $ fc
+    Just at <- readRef rmta
+    Just bt <- readRef rmtb
+    cr0 <- fireEventsAndRead [] $ eventValue ehc
+    liftIO $ Nothing @=? cr0
+    cr1 <- fireEventsAndRead [at :=> Identity 2, bt :=> Identity 2] $ eventValue ehc
+    liftIO $ (Just 4) @=? cr1
+    cr2 <- fireEventsAndRead [at :=> Identity 3] $ eventValue ehc
+    liftIO $ (Just 5) @=? cr2
+    cr2 <- fireEventsAndRead [bt :=> Identity 3] $ eventValue ehc
+    liftIO $ (Just 6) @=? cr2
   where
     eventValue eh = readEvent eh >>= sequence
     checkStep (tv, ved, vba, vbb) = do

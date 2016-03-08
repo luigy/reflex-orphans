@@ -13,5 +13,6 @@ instance Reflex t => Applicative (Dynamic t) where
     f <*> x = unsafeDynamic
               ((current f) <*> (current x))
               (push (\case
-                        These a b -> return . Just $ a b
-                        _ -> return Nothing) $ align (updated f) (updated x))
+                        This a -> (Just . a) <$> (sample . current $ x)
+                        That b -> (Just . ($ b)) <$> (sample . current $ f)
+                        These a b -> return . Just $ a b) $ align (updated f) (updated x))
