@@ -1,18 +1,19 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Reflex.Orphans () where
 
-import Data.These
-import Data.Align
+import Data.Aeson
+import Data.AppendMap
+import qualified Data.Map as Map
 import Reflex
 
-instance Reflex t => Functor (Dynamic t) where
-    fmap f d = unsafeDynamic (fmap f . current $ d) (fmap f . updated $ d)
+instance (ToJSON k, ToJSON m) => ToJSON (AppendMap k m) where
+  toJSON = toJSON . Map.toList . _unAppendMap
 
-instance Reflex t => Applicative (Dynamic t) where
-    pure = constDyn
-    f <*> x = unsafeDynamic
-              ((current f) <*> (current x))
-              (push (\case
-                        This a -> (Just . a) <$> (sample . current $ x)
-                        That b -> (Just . ($ b)) <$> (sample . current $ f)
-                        These a b -> return . Just $ a b) $ align (updated f) (updated x))
+instance (FromJSON k, FromJSON m, Ord k) => FromJSON (AppendMap k m) where
+  parseJSON r = do
+    res <- parseJSON r
+    fmap AppendMap . sequence . Map.fromListWithKey (fail "duplicate key in JSON deserialization of AppendMap") . fmap (fmap return) $ res
+
+deriving instance FromJSON SelectedCount
+deriving instance ToJSON SelectedCount
