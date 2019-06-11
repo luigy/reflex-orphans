@@ -15,5 +15,6 @@ instance (FromJSON k, FromJSON m, Ord k) => FromJSON (AppendMap k m) where
     res <- parseJSON r
     fmap AppendMap . sequence . Map.fromListWithKey (fail "duplicate key in JSON deserialization of AppendMap") . fmap (fmap return) $ res
 
+
 deriving instance FromJSON SelectedCount
 deriving instance ToJSON SelectedCount
