@@ -12,6 +12,7 @@ instance (ToJSON k, ToJSON m) => ToJSON (AppendMap k m) where
   toJSON = toJSON . Map.toList . _unAppendMap
 
 
+
 instance (FromJSON k, FromJSON m, Ord k) => FromJSON (AppendMap k m) where
   parseJSON r = do
     res <- parseJSON r
