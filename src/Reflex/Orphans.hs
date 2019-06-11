@@ -7,7 +7,6 @@ import Data.AppendMap
 import qualified Data.Map as Map
 import Reflex
 
-
 instance (ToJSON k, ToJSON m) => ToJSON (AppendMap k m) where
   toJSON = toJSON . Map.toList . _unAppendMap
 
